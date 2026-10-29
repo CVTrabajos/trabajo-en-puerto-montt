@@ -1,4 +1,4 @@
-name: Actualizar ofertas
+name: Actualizar Ofertas Automaticamente
 
 on:
   schedule:
@@ -8,38 +8,23 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: actualizar-ofertas
-  cancel-in-progress: false
-
 jobs:
-  actualizar:
+  update-offers:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
 
-      - name: Descargar ofertas desde Apps Script
-        env:
-          APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwPRR9dQyEd7ZZAnZPfWH-oODgzTul-ItsbTEbb8BZwrinrrMRqXDVm1Pp7qvwxjpjm/exec"
+      - name: Descargar ofertas desde Google Apps Script
         run: |
-          curl -sL --retry 3 --max-time 90 "$APPS_SCRIPT_URL" -o nuevo.json
-          python3 - <<'EOF'
-          import json, sys
-          try:
-              d = json.load(open('nuevo.json', encoding='utf-8'))
-          except Exception as e:
-              sys.exit("Respuesta no válida: %s" % e)
-          if not isinstance(d, list) or len(d) == 0:
-              sys.exit("La lista vino vacía, no se actualiza")
-          with open('ofertas.json', 'w', encoding='utf-8') as f:
-              json.dump(d, f, ensure_ascii=False, separators=(',', ':'))
-          print("Ofertas guardadas:", len(d))
-          EOF
-          rm -f nuevo.json
+          curl -L -s -o ofertas.json "https://script.google.com/macros/s/AKfycbxvhd7eOy5Z1Z1-ZyEfW2iMU2F7BUFzqz40xXA2whqB2iC8Kl9MacCm8LdUKI26lw5s/exec"
+          if [ ! -s ofertas.json ]; then
+            echo "[]" > ofertas.json
+          fi
 
-      - name: Guardar cambios
+      - name: Confirmar y subir cambios
         run: |
-          git config user.name "actualizador"
-          git config user.email "actualizador@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add ofertas.json
-          git diff --cached --quiet || (git commit -m "Actualizar ofertas" && git push)
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto: Actualizar ofertas vigentes [skip ci]" && git push)
